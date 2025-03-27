@@ -6,12 +6,9 @@ M = 1048576576
 
 previous = 5000
 
-# Criterio de Parada
-count = 100000
-
 # G/G/S/K
 S = 1 # Número de servidores
-K = 10 # Capacidade de clientes da fila
+K = 5 # Capacidade de clientes da fila
 
 # Tempo de chegada entre os clientes
 CHEGADA_ENTRE_INICIAL = 2
@@ -38,8 +35,8 @@ class EventoTipo(Enum):
     tipo_chegada = 1
     tipo_saida = 2
 
-
 def nextRandon():
+    global previous
     previous = (A*previous + C) % M
     return previous / M
 
@@ -50,33 +47,48 @@ def sorteio(evento):
 
 # Chegada de um cliente
 def chegada(evento):
-    times[fila.__len__] = times[fila.__len__] + tempo_chegada
+    global tempo_chegada
+    global n_perdas
+
+    if isinstance(tempo_chegada, EventoTipo):
+        tempo_chegada = tempo_chegada.value 
+    else:
+        times[len(fila)] = times[len(fila)] + tempo_chegada 
     tempo_chegada = evento
-    if fila.__len__ < K:
+
+    if len(fila) < K:
         fila.append(1)
         
-        if fila.__len__ <= S:
+        if len(fila) <= S:
             saida(TEMPO_GLOBAL + sorteio(evento))
+            return
     else:
         n_perdas = n_perdas + 1
+        return
     chegada(TEMPO_GLOBAL + sorteio(evento))
 
-    
 
 # Saída de um cliente
 def saida(evento):
-    times[fila.__len__] = times[fila.__len__] + tempo_saida
+    global tempo_saida
+    times[len(fila)] = times[len(fila)] + tempo_saida
     
     tempo_saida = evento
     
-    fila.pop()
-    if fila.__len__ >= S:
-        saida(TEMPO_GLOBAL + sorteio(evento))
-    
+    if fila:
+        fila.pop()
+        if len(fila) >= S:
+            saida(TEMPO_GLOBAL + sorteio(evento))
    
 # Próximo evento
 def nextEvent():
-    aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada
+    global TEMPO_GLOBAL
+
+    if isinstance(tempo_chegada, EventoTipo):
+        aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada.value
+    else:
+        aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada
+
     aux_tempo_saida = TEMPO_GLOBAL + tempo_saida
     
     if(aux_tempo_chegada < aux_tempo_saida):
@@ -84,26 +96,27 @@ def nextEvent():
         return EventoTipo.tipo_chegada
     
     TEMPO_GLOBAL = aux_tempo_saida
-    return EventoTipo.tipo_saida 
+
+    return EventoTipo.tipo_saida
 
 
-while(count > 0):
-    evento = nextEvent()
+def main():
+    # Criterio de Parada
+    count = 100000
+
+    while(count > 0):
+        count = count - 1
+        evento = nextEvent()
+
+        if(evento == EventoTipo.tipo_chegada):
+            chegada(evento)
+        elif(evento == EventoTipo.tipo_saida):
+            saida(evento)    
+
+    for i in range(K):      
+        print(f"{i}: {times[i]} ({times[i] / TEMPO_GLOBAL}%)\n ")
     
-    if(evento == EventoTipo.tipo_chegada):
-        chegada(evento)
-    elif(evento == EventoTipo.tipo_saida):
-        saida(evento)
+        
 
-    count = count - 1
-    
-
-
-for i in range(K):
-    print(i + ": "+ times[i] +" ("+ times[i] / TEMPO_GLOBAL +"\%)\n")
-
-
-
-
-
-
+if __name__=="__main__":
+    main()
