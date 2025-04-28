@@ -8,115 +8,123 @@ previous = 5000
 
 # G/G/S/K
 S = 1 # Número de servidores
-K = 5 # Capacidade de clientes da fila
+K = 5 # Capacidade de clientes da fila  
 
-# Tempo de chegada entre os clientes
+# Tempo de chegada de novos clientes
 CHEGADA_ENTRE_INICIAL = 2
 CHEGADA_ENTRE_FINAL = 5
 
-# Tempo de saida entre os clientes
+# Tempo para atendimento dos clientes
 SAIDA_ENTRE_INICIAL = 3
 SAIDA_ENTRE_FINAL = 5
 
-# fila de clientes
-fila = []
-times = [0] * K
-n_perdas = 0
+tamFila = 0
+escalonador = []
+filaClientes = []
+times = [0] * (K+1)
+clientesPerdidos = 0
 
 TEMPO_GLOBAL = 0
 
 # Estado Inicial
-tempo_chegada = 2
+TEMPO_CHEGADA = 2
+ultimo_tempo_global = 0
 tempo_saida = float('inf')
 
-from enum import Enum
+class Evento():
+    def __init__(self, tipoEvento, tempo):
+        self.tipoEvento = tipoEvento
+        self.tempo = tempo
 
-class EventoTipo(Enum):
-    tipo_chegada = 1
-    tipo_saida = 2
+    def __str__(self):
+        return f"Evento: {self.tipoEvento}\nTempo: {self.tempo}\n"
 
 def nextRandon():
     global previous
     previous = (A*previous + C) % M
     return previous / M
 
+# Fórmula de conversão
 def sorteio(evento):
-    if evento == EventoTipo.tipo_chegada:
+    if evento.tipoEvento == "Chegada":
         return (CHEGADA_ENTRE_FINAL - CHEGADA_ENTRE_INICIAL) * nextRandon() + CHEGADA_ENTRE_INICIAL
     return (SAIDA_ENTRE_FINAL - SAIDA_ENTRE_INICIAL) * nextRandon() + SAIDA_ENTRE_INICIAL
 
 # Chegada de um cliente
 def chegada(evento):
-    global tempo_chegada
-    global n_perdas
+    global clientesPerdidos
+    global tamFila
 
-    if isinstance(tempo_chegada, EventoTipo):
-        tempo_chegada = tempo_chegada.value 
-    else:
-        times[len(fila)] = times[len(fila)] + tempo_chegada 
-    tempo_chegada = evento
+    global ultimo_tempo_global
+    
+    if tamFila <= K:
+        times[tamFila] = times[tamFila] + ultimo_tempo_global 
 
-    if len(fila) < K:
-        fila.append(1)
-        
-        if len(fila) <= S:
-            saida(TEMPO_GLOBAL + sorteio(evento))
-            return
-    else:
-        n_perdas = n_perdas + 1
-        return
-    chegada(TEMPO_GLOBAL + sorteio(evento))
+    ultimo_tempo_global = evento.tempo
 
+    if tamFila < K:
+        tamFila = tamFila + 1
+        if tamFila <= S:
+            # Agenda o atendimento do cliente
+            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+        else:
+            clientesPerdidos += 1
 
-# Saída de um cliente
+    # Agenda a chegada do cliente
+    escalonador.append(Evento("Chegada", TEMPO_GLOBAL + sorteio(evento)))
+    # Ordena o escalonador de acordo com o tempo
+    escalonador.sort(key=lambda x: x.tempo)
+
+    
+
+# Atendimento de um cliente
 def saida(evento):
-    global tempo_saida
-    times[len(fila)] = times[len(fila)] + tempo_saida
-    
-    tempo_saida = evento
-    
-    if fila:
-        fila.pop()
-        if len(fila) >= S:
-            saida(TEMPO_GLOBAL + sorteio(evento))
-   
-# Próximo evento
-def nextEvent():
-    global TEMPO_GLOBAL
+    global ultimo_tempo_global
+    global tamFila
 
-    if isinstance(tempo_chegada, EventoTipo):
-        aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada.value
-    else:
-        aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada
+    if tamFila <= K:
+        times[tamFila] = times[tamFila] + ultimo_tempo_global
 
-    aux_tempo_saida = TEMPO_GLOBAL + tempo_saida
+    ultimo_tempo_global = evento.tempo
     
-    if(aux_tempo_chegada < aux_tempo_saida):
-        TEMPO_GLOBAL = aux_tempo_chegada
-        return EventoTipo.tipo_chegada
+    tamFila = tamFila - 1
+    if tamFila >= S:
+        # Agenda o atendimento do cliente
+        escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
     
-    TEMPO_GLOBAL = aux_tempo_saida
-
-    return EventoTipo.tipo_saida
-
+    # Ordena o escalonador de acordo com o tempo
+    escalonador.sort(key=lambda x: x.tempo)
 
 def main():
+    global TEMPO_GLOBAL
+
     # Criterio de Parada
-    count = 100000
+    count = 100
+    
+    # Primeiro cliente chegando...
+    escalonador.append(Evento("Chegada", TEMPO_CHEGADA))
 
     while(count > 0):
         count = count - 1
-        evento = nextEvent()
 
-        if(evento == EventoTipo.tipo_chegada):
+        #print(escalonador[0])
+        print(times)
+        
+        evento = escalonador.pop(0)
+        TEMPO_GLOBAL = evento.tempo
+        
+        if evento.tipoEvento == "Chegada":
             chegada(evento)
-        elif(evento == EventoTipo.tipo_saida):
-            saida(evento)    
+        else:
+            saida(evento)
 
-    for i in range(K):      
+
+    print("Tempo Global do Sistema:", TEMPO_GLOBAL)
+    print("Clientes perdidos: ", clientesPerdidos, "\n")
+    print("Simulação (Estado - Tempo - Probabilidade)")
+
+    for i in range(K+1):      
         print(f"{i}: {times[i]} ({times[i] / TEMPO_GLOBAL}%)\n ")
     
-        
-
 if __name__=="__main__":
     main()
