@@ -1,3 +1,8 @@
+import sys
+import yaml
+
+from fila import Fila
+
 # Gerador de Números Pseudo-Aleatórios: Congruência Linear
 # Xn+1c= (aXn+c) mod m
 A = 1255
@@ -6,117 +11,214 @@ M = 1048576576
 
 previous = 5000
 
-# G/G/S/K
-S = 1 # Número de servidores
-K = 5 # Capacidade de clientes da fila
+filas = []
 
-# Tempo de chegada entre os clientes
-CHEGADA_ENTRE_INICIAL = 2
-CHEGADA_ENTRE_FINAL = 5
-
-# Tempo de saida entre os clientes
-SAIDA_ENTRE_INICIAL = 3
-SAIDA_ENTRE_FINAL = 5
-
-# fila de clientes
-fila = []
-times = [0] * K
-n_perdas = 0
+nroDeFilas = 1
+escalonador = []
+filaClientes = []
 
 TEMPO_GLOBAL = 0
+TEMPO_CHEGADA = 2
+ultimo_tempo_global = 0
 
-# Estado Inicial
-tempo_chegada = 2
-tempo_saida = float('inf')
+class Evento():
+    def __init__(self, tipoEvento, tempo):
+        self.tipoEvento = tipoEvento
+        self.tempo = tempo
 
-from enum import Enum
-
-class EventoTipo(Enum):
-    tipo_chegada = 1
-    tipo_saida = 2
+    def __str__(self):
+        return f"Evento: {self.tipoEvento}\nTempo: {self.tempo}\n"
 
 def nextRandon():
     global previous
     previous = (A*previous + C) % M
     return previous / M
 
+
+# Fórmula de conversão
 def sorteio(evento):
-    if evento == EventoTipo.tipo_chegada:
-        return (CHEGADA_ENTRE_FINAL - CHEGADA_ENTRE_INICIAL) * nextRandon() + CHEGADA_ENTRE_INICIAL
-    return (SAIDA_ENTRE_FINAL - SAIDA_ENTRE_INICIAL) * nextRandon() + SAIDA_ENTRE_INICIAL
+    if evento.tipoEvento == "Chegada":
+        return (filas[0].ChegadaFinal() - filas[0].ChegadaInicio()) * nextRandon() + filas[0].ChegadaInicio() 
+    if evento.tipoEvento == "Saida":
+        return (filas[1].AtendimentoFinal() - filas[1].AtendimentoInicio()) * nextRandon() + filas[1].AtendimentoInicio()
+
+    # tipoEvento == Passagem
+    return (filas[0].AtendimentoFinal() - filas[0].AtendimentoInicio()) * nextRandon() + filas[0].AtendimentoInicio() 
+
 
 # Chegada de um cliente
 def chegada(evento):
-    global tempo_chegada
-    global n_perdas
-
-    if isinstance(tempo_chegada, EventoTipo):
-        tempo_chegada = tempo_chegada.value 
-    else:
-        times[len(fila)] = times[len(fila)] + tempo_chegada 
-    tempo_chegada = evento
-
-    if len(fila) < K:
-        fila.append(1)
+    global ultimo_tempo_global
+    
+    # Tempo
+    if filas[0].Status() <= filas[0].Capacity():
+        tempoFilaX = filas[0].ArrayDeTempos()
+        tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
         
-        if len(fila) <= S:
-            saida(TEMPO_GLOBAL + sorteio(evento))
-            return
-    else:
-        n_perdas = n_perdas + 1
-        return
-    chegada(TEMPO_GLOBAL + sorteio(evento))
+        tempoFilaY = filas[1].ArrayDeTempos()
+        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+
+    ultimo_tempo_global = TEMPO_GLOBAL
+
+    if filas[0].Status() < filas[0].Capacity():
+        # Aumenta em 1 cliente a fila Q1
+        filas[0].In()
+        if filas[0].Status() <= filas[0].Servers():
+            # Agenda o atendimento do cliente
+            escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+        else:
+            filas[0].Loss()
+
+    # Agenda a chegada do cliente
+    escalonador.append(Evento("Chegada", TEMPO_GLOBAL + sorteio(evento)))
+    # Ordena o escalonador de acordo com o tempo
+    escalonador.sort(key=lambda x: x.tempo)
 
 
-# Saída de um cliente
+# Atendimento de um cliente
 def saida(evento):
-    global tempo_saida
-    times[len(fila)] = times[len(fila)] + tempo_saida
-    
-    tempo_saida = evento
-    
-    if fila:
-        fila.pop()
-        if len(fila) >= S:
-            saida(TEMPO_GLOBAL + sorteio(evento))
-   
-# Próximo evento
-def nextEvent():
-    global TEMPO_GLOBAL
+    global ultimo_tempo_global
 
-    if isinstance(tempo_chegada, EventoTipo):
-        aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada.value
+    # Tempo
+    if filas[1].Status() <= filas[1].Capacity():
+        tempoFilaY = filas[1].ArrayDeTempos()
+        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        
+        tempoFilaZ = filas[0].ArrayDeTempos()
+        tempoFilaZ[filas[0].Status()] = tempoFilaZ[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+
+    ultimo_tempo_global = TEMPO_GLOBAL
+    
+    filas[1].Out()
+    if filas[1].Status() >= filas[1].Servers():
+        # Agenda o atendimento do cliente
+        escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+    
+    # Ordena o escalonador de acordo com o tempo
+    escalonador.sort(key=lambda x: x.tempo)
+
+
+# Passagem para outra fila
+def passagem(evento):
+    global ultimo_tempo_global
+
+    # Acumula tempo
+    if filas[1].Status() <= filas[1].Capacity():
+        tempoFilaX = filas[0].ArrayDeTempos()
+        tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        tempoFilaY = filas[1].ArrayDeTempos()
+        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+
+    ultimo_tempo_global = TEMPO_GLOBAL
+    
+    
+    filas[0].Out()
+    if filas[0].Status() >= filas[0].Servers():
+        escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+    
+    if filas[1].Status() < filas[1].Capacity():
+        filas[1].In()
+        if filas[1].Status() <= filas[1].Servers():
+            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
     else:
-        aux_tempo_chegada = TEMPO_GLOBAL + tempo_chegada
+        filas[1].Loss()
 
-    aux_tempo_saida = TEMPO_GLOBAL + tempo_saida
-    
-    if(aux_tempo_chegada < aux_tempo_saida):
-        TEMPO_GLOBAL = aux_tempo_chegada
-        return EventoTipo.tipo_chegada
-    
-    TEMPO_GLOBAL = aux_tempo_saida
 
-    return EventoTipo.tipo_saida
+def leituraArquivo(arquivo):
+    global filas, TEMPO_CHEGADA
+    with open(arquivo, 'r') as f:
+        dados = yaml.safe_load(f)
+
+    secaoFilasYml = dados['queues']
+    secaoArrivalsYml = dados.get('arrivals', {})
+    
+    for id, config in secaoFilasYml.items():
+        min_arrival = min_arrival = config.get('minArrival')
+        max_arrival = max_arrival = config.get('maxArrival')
+
+        fila = Fila(
+            IdentificadorFila = id,
+            S = config['servers'],
+            K = config['capacity'],
+            CHEGADA_ENTRE_INICIAL = min_arrival,
+            CHEGADA_ENTRE_FINAL = max_arrival,
+            SAIDA_ENTRE_INICIAL = config['minService'],
+            SAIDA_ENTRE_FINAL = config['maxService']
+        )
+        filas.append(fila)
+
+    if secaoArrivalsYml:
+        _, valor = next(iter(secaoArrivalsYml.items()))
+        TEMPO_CHEGADA = valor
 
 
 def main():
+    global TEMPO_GLOBAL
+
+    if len(sys.argv) != 2:
+        print("Utilize o comando $ python3 main.py <caminho_arquivo>.yml")
+        sys.exit(1)
+
+    arquivo = sys.argv[1]
+    try:
+        leituraArquivo(arquivo)
+    except Exception as e:
+        print(f"Erro ao ler o arquivo .yml: {e}")
+        sys.exit(1)
+
+    #for i in range(len(filas)):
+     #   print(filas[i])
+    
     # Criterio de Parada
-    count = 100000
+    count = 100_000
+
+    # Primeiro cliente chegando...
+    escalonador.append(Evento("Chegada", TEMPO_CHEGADA))
 
     while(count > 0):
         count = count - 1
-        evento = nextEvent()
-
-        if(evento == EventoTipo.tipo_chegada):
-            chegada(evento)
-        elif(evento == EventoTipo.tipo_saida):
-            saida(evento)    
-
-    for i in range(K):      
-        print(f"{i}: {times[i]} ({times[i] / TEMPO_GLOBAL}%)\n ")
-    
         
+        evento = escalonador.pop(0)
+        TEMPO_GLOBAL = evento.tempo
+        filaClientes.append(evento)
+        
+        if evento.tipoEvento == "Chegada":
+            chegada(evento)
+        elif evento.tipoEvento == "Saida":
+            saida(evento)
+        else:
+            passagem(evento)
+
+    print("Tempo Global do Sistema:", TEMPO_GLOBAL)
+    # print("Clientes perdidos: ", clientesPerdidos, "\n")
+    # print("Simulação (Estado - Tempo - Probabilidade)")
+
+    # for i in range(K+1):      
+    #     print(f"{i}: {times[i]} ({round((times[i] / TEMPO_GLOBAL) * 100, 2)}%)\n ")
+
+
+    data = []
+    for i in range(0, len(filas)): 
+        t = filas[i].ArrayDeTempos()
+        for j in range(filas[i].Capacity()+1):    
+            data.append([filas[i].ArrayDeTempos()[j], (filas[i].ArrayDeTempos()[j]/TEMPO_GLOBAL)*100])
+	
+    print("Simulação (Estado - Tempo - Probabilidade)")
+    for i in range(len(filas)):
+        print(f"Fila {i+1}:")
+        print("Estado | Tempo | Probabilidade")
+        total_tempo = 0
+        t = filas[i].ArrayDeTempos()
+        for j in range(filas[i].Capacity() + 1):
+            print(f"{j}       {t[j]}       {round((t[j] / TEMPO_GLOBAL) * 100, 2)}%")
+            total_tempo += t[j]
+        print(f"Total Tempo: {total_tempo}")
+        print()
+        total_probabilidade = 0
+        for j in range(filas[i].Capacity() + 1):
+            total_probabilidade += (t[j] / TEMPO_GLOBAL) * 100
+        print(f"Total Probabilidade: {round(total_probabilidade, 2)}%")
+        print(f"Clientes Perdidos na Fila {i+1}: {filas[i].getLoss()}")
 
 if __name__=="__main__":
     main()
