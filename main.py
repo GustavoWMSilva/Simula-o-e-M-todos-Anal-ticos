@@ -3,6 +3,7 @@ import yaml
 
 from fila import Fila
 
+
 # Gerador de Números Pseudo-Aleatórios: Congruência Linear
 # Xn+1c= (aXn+c) mod m
 A = 1255
@@ -64,8 +65,13 @@ def chegada(evento):
         # Aumenta em 1 cliente a fila Q1
         filas[0].In()
         if filas[0].Status() <= filas[0].Servers():
-            # Agenda o atendimento do cliente
-            escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+
+            if nextRandon() < filas[0].filasTarget[0]['probability']:
+                # Agenda o atendimento do cliente
+                escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+            else:
+                # Agenda o atendimento do cliente
+                escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
         else:
             filas[0].Loss()
 
@@ -91,9 +97,13 @@ def saida(evento):
     
     filas[1].Out()
     if filas[1].Status() >= filas[1].Servers():
-        # Agenda o atendimento do cliente
-        escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
-    
+        if nextRandon() < filas[1].filasTarget[0]['probability']:
+            # Passagem para outra fila
+            escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+        else:
+            # Agenda o atendimento do cliente
+            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+
     # Ordena o escalonador de acordo com o tempo
     escalonador.sort(key=lambda x: x.tempo)
 
@@ -114,8 +124,13 @@ def passagem(evento):
     
     filas[0].Out()
     if filas[0].Status() >= filas[0].Servers():
-        escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
-    
+        if nextRandon() < filas[0].filasTarget[0]['probability']:
+            # Passagem para outra fila
+            escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+        else:
+            # Agenda o atendimento do cliente
+            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+
     if filas[1].Status() < filas[1].Capacity():
         filas[1].In()
         if filas[1].Status() <= filas[1].Servers():
@@ -130,20 +145,36 @@ def leituraArquivo(arquivo):
         dados = yaml.safe_load(f)
 
     secaoFilasYml = dados['queues']
+    secaoNetworkYml = dados['network']
     secaoArrivalsYml = dados.get('arrivals', {})
     
     for id, config in secaoFilasYml.items():
         min_arrival = min_arrival = config.get('minArrival')
         max_arrival = max_arrival = config.get('maxArrival')
 
+        # Adiciona os targets para as filas com base no arquivo de configuração
+        network = []
+        for connection in secaoNetworkYml:
+            if connection['source'] == id:
+                network.append({
+                    'target': connection['target'],
+                    'probability': connection['probability']
+                })
+
+        print(f"Fila {id} -> Conexões: {network}")
+
+        for conn in network:
+            print(f"{id} -> {conn['target']} tem probabilidade {conn['probability']}")
+
         fila = Fila(
-            IdentificadorFila = id,
-            S = config['servers'],
-            K = config['capacity'],
-            CHEGADA_ENTRE_INICIAL = min_arrival,
-            CHEGADA_ENTRE_FINAL = max_arrival,
-            SAIDA_ENTRE_INICIAL = config['minService'],
-            SAIDA_ENTRE_FINAL = config['maxService']
+            IdentificadorFila=id,
+            S=config['servers'],
+            K=config['capacity'],
+            CHEGADA_ENTRE_INICIAL=min_arrival,
+            CHEGADA_ENTRE_FINAL=max_arrival,
+            SAIDA_ENTRE_INICIAL=config['minService'],
+            SAIDA_ENTRE_FINAL=config['maxService'],
+            filasTarget=network
         )
         filas.append(fila)
 
@@ -170,7 +201,7 @@ def main():
      #   print(filas[i])
     
     # Criterio de Parada
-    count = 100_000
+    count = 123456
 
     # Primeiro cliente chegando...
     escalonador.append(Evento("Chegada", TEMPO_CHEGADA))
