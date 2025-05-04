@@ -1,6 +1,8 @@
 import sys
 import yaml
 
+from fila import Fila
+
 # Gerador de Números Pseudo-Aleatórios: Congruência Linear
 # Xn+1c= (aXn+c) mod m
 A = 1255
@@ -9,28 +11,13 @@ M = 1048576576
 
 previous = 5000
 
-# G/G/S/K
-S = 1 # Número de servidores
-K = 5 # Capacidade de clientes da fila  
+filas = []
 
-# Tempo de chegada de novos clientes
-CHEGADA_ENTRE_INICIAL = 2
-CHEGADA_ENTRE_FINAL = 5
-
-# Tempo para atendimento dos clientes
-SAIDA_ENTRE_INICIAL = 3
-SAIDA_ENTRE_FINAL = 5
-
-tamFila = 0
 nroDeFilas = 1
 escalonador = []
 filaClientes = []
-times = [0] * (K+1)
-clientesPerdidos = 0
 
 TEMPO_GLOBAL = 0
-
-# Estado Inicial
 TEMPO_CHEGADA = 2
 ultimo_tempo_global = 0
 
@@ -47,30 +34,32 @@ def nextRandon():
     previous = (A*previous + C) % M
     return previous / M
 
+
 # Fórmula de conversão
 def sorteio(evento):
     if evento.tipoEvento == "Chegada":
-        return (CHEGADA_ENTRE_FINAL - CHEGADA_ENTRE_INICIAL) * nextRandon() + CHEGADA_ENTRE_INICIAL
-    return (SAIDA_ENTRE_FINAL - SAIDA_ENTRE_INICIAL) * nextRandon() + SAIDA_ENTRE_INICIAL
+        return (filas[0].ChegadaFinal() - filas[0].ChegadaInicio()) * nextRandon() + filas[0].ChegadaInicio()
+    return (filas[1].AtendimentoFinal() - filas[1].AtendimentoInicio()) * nextRandon() + filas[1].AtendimentoInicio()
+
 
 # Chegada de um cliente
 def chegada(evento):
-    global clientesPerdidos
-    global tamFila
     global ultimo_tempo_global
     
-    if tamFila <= K:
-        times[tamFila] = times[tamFila] + (TEMPO_GLOBAL - ultimo_tempo_global)
+    if filas[0].Status() <= filas[0].Capacity():
+        tempoFilaX = filas[0].ArrayDeTempos()
+        tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
 
-    if tamFila < K:
-        tamFila = tamFila + 1
-        if tamFila <= S:
+    if filas[0].Status() < filas[0].Capacity():
+        # Aumenta em 1 cliente a fila Q1
+        filas[0].In()
+        if filas[0].Status() <= filas[0].Servers():
             # Agenda o atendimento do cliente
-            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+            escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
         else:
-            clientesPerdidos += 1
+            filas[0].Loss()
 
     # Agenda a chegada do cliente
     escalonador.append(Evento("Chegada", TEMPO_GLOBAL + sorteio(evento)))
@@ -81,15 +70,15 @@ def chegada(evento):
 # Atendimento de um cliente
 def saida(evento):
     global ultimo_tempo_global
-    global tamFila
 
-    if tamFila <= K:
-        times[tamFila] = times[tamFila] + (TEMPO_GLOBAL - ultimo_tempo_global)
+    if filas[1].Status() <= filas[1].Capacity():
+        tempoFilaY = filas[1].ArrayDeTempos()
+        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
     
-    tamFila -= 1
-    if tamFila >= S:
+    filas[1].Out()
+    if filas[1].Status() >= filas[1].Servers():
         # Agenda o atendimento do cliente
         escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
     
@@ -97,22 +86,54 @@ def saida(evento):
     escalonador.sort(key=lambda x: x.tempo)
 
 
+# Passagem para outra fila
+def passagem(evento):
+    global ultimo_tempo_global
+
+    # Acumula tempo
+    #if filas[1].Status() <= filas[1].Capacity():
+    #    tempoFilaY = filas[1].ArrayDeTempos()
+    #    tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+
+    #ultimo_tempo_global = TEMPO_GLOBAL
+    filas[0].Out()
+    if filas[0].Status() >= filas[0].Servers():
+        escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+    
+    if filas[1].Status() < filas[1].Capacity():
+        filas[1].In()
+        if filas[1].Status() <= filas[1].Servers():
+            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+    else:
+        filas[1].Loss()    
+
+
 def leituraArquivo(arquivo):
-    global S, K, CHEGADA_ENTRE_INICIAL, CHEGADA_ENTRE_FINAL, SAIDA_ENTRE_INICIAL, SAIDA_ENTRE_FINAL, TEMPO_CHEGADA
+    global filas, TEMPO_CHEGADA
     with open(arquivo, 'r') as f:
         dados = yaml.safe_load(f)
 
-    fila = dados['Q1']
+    secaoFilasYml = dados['queues']
+    secaoArrivalsYml = dados.get('arrivals', {})
+    
+    for id, config in secaoFilasYml.items():
+        min_arrival = min_arrival = config.get('minArrival')
+        max_arrival = max_arrival = config.get('maxArrival')
 
-    S = fila.get('servers') # Numero de servidores
-    K = fila.get('capacity') # Capacidade da fila
-    CHEGADA_ENTRE_INICIAL = fila.get('minArrival')
-    CHEGADA_ENTRE_FINAL = fila.get('maxArrival')
-    SAIDA_ENTRE_INICIAL = fila.get('minService')
-    SAIDA_ENTRE_FINAL = fila.get('maxService')
-    TEMPO_CHEGADA = fila.get('tempoChegada') # Tempo de chegada do primeiro cliente
+        fila = Fila(
+            IdentificadorFila = id,
+            S = config['servers'],
+            K = config['capacity'],
+            CHEGADA_ENTRE_INICIAL = min_arrival,
+            CHEGADA_ENTRE_FINAL = max_arrival,
+            SAIDA_ENTRE_INICIAL = config['minService'],
+            SAIDA_ENTRE_FINAL = config['maxService']
+        )
+        filas.append(fila)
 
-    return S ,K ,CHEGADA_ENTRE_INICIAL ,CHEGADA_ENTRE_FINAL ,SAIDA_ENTRE_INICIAL ,SAIDA_ENTRE_FINAL ,TEMPO_CHEGADA
+    if secaoArrivalsYml:
+        _, valor = next(iter(secaoArrivalsYml.items()))
+        TEMPO_CHEGADA = valor
 
 
 def main():
@@ -129,8 +150,11 @@ def main():
         print(f"Erro ao ler o arquivo .yml: {e}")
         sys.exit(1)
 
+    for i in range(len(filas)):
+        print(filas[i])
+    
     # Criterio de Parada
-    count = 100000
+    count = 100
 
     # Primeiro cliente chegando...
     escalonador.append(Evento("Chegada", TEMPO_CHEGADA))
@@ -146,13 +170,15 @@ def main():
             chegada(evento)
         elif evento.tipoEvento == "Saida":
             saida(evento)
+        else:
+            passagem(evento)
 
     print("Tempo Global do Sistema:", TEMPO_GLOBAL)
-    print("Clientes perdidos: ", clientesPerdidos, "\n")
-    print("Simulação (Estado - Tempo - Probabilidade)")
+    # print("Clientes perdidos: ", clientesPerdidos, "\n")
+    # print("Simulação (Estado - Tempo - Probabilidade)")
 
-    for i in range(K+1):      
-        print(f"{i}: {times[i]} ({round((times[i] / TEMPO_GLOBAL) * 100, 2)}%)\n ")
+    # for i in range(K+1):      
+    #     print(f"{i}: {times[i]} ({round((times[i] / TEMPO_GLOBAL) * 100, 2)}%)\n ")
     
 if __name__=="__main__":
     main()
