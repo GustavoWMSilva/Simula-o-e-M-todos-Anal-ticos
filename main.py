@@ -51,13 +51,11 @@ def sorteio(evento):
 def chegada(evento):
     global ultimo_tempo_global
     
-    # Tempo
+    # Acumula tempo
     if filas[0].Status() <= filas[0].Capacity():
-        tempoFilaX = filas[0].ArrayDeTempos()
-        tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
-        
-        tempoFilaY = filas[1].ArrayDeTempos()
-        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        for i in range(len(filas)):
+            tempoFilaAux = filas[i].ArrayDeTempos()
+            tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
 
@@ -85,13 +83,11 @@ def chegada(evento):
 def saida(evento):
     global ultimo_tempo_global
 
-    # Tempo
+    # Acumula tempo
     if filas[1].Status() <= filas[1].Capacity():
-        tempoFilaY = filas[1].ArrayDeTempos()
-        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
-        
-        tempoFilaZ = filas[0].ArrayDeTempos()
-        tempoFilaZ[filas[0].Status()] = tempoFilaZ[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        for i in range(len(filas)):
+           tempoFilaAux = filas[i].ArrayDeTempos()
+           tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
     
@@ -114,10 +110,9 @@ def passagem(evento):
 
     # Acumula tempo
     if filas[1].Status() <= filas[1].Capacity():
-        tempoFilaX = filas[0].ArrayDeTempos()
-        tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
-        tempoFilaY = filas[1].ArrayDeTempos()
-        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        for i in range(len(filas)):
+           tempoFilaAux = filas[i].ArrayDeTempos()
+           tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
     
