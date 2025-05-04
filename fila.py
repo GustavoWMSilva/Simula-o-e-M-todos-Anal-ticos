@@ -17,7 +17,8 @@ class Fila:
 
 
     def __str__(self):
-        return f"Fila: {self.IdentificadorFila}, {self.S}, {self.CHEGADA_ENTRE_INICIAL}, {self.CHEGADA_ENTRE_FINAL}, {self.K}, {self.SAIDA_ENTRE_INICIAL}, {self.SAIDA_ENTRE_FINAL}, {self.times}"
+        return (f"Fila: {self.IdentificadorFila}, {self.S}, {self.CHEGADA_ENTRE_INICIAL}, {self.CHEGADA_ENTRE_FINAL}, "
+                f"{self.K}, {self.SAIDA_ENTRE_INICIAL}, {self.SAIDA_ENTRE_FINAL}, {self.times}, {self.filasTarget}")
 
 
     def Status(self):
@@ -65,3 +66,12 @@ class Fila:
 
     def AtendimentoFinal(self):
         return self.SAIDA_ENTRE_FINAL
+    
+    def getIdentificadorFila(self):
+        return self.IdentificadorFila
+    
+    def getFilaTarget(self):
+        return self.filasTarget
+    
+    def setFilaTarget(self, filaTarget):
+        self.filasTarget = filaTarget
