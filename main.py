@@ -38,14 +38,19 @@ def nextRandon():
 # Fórmula de conversão
 def sorteio(evento):
     if evento.tipoEvento == "Chegada":
-        return (filas[0].ChegadaFinal() - filas[0].ChegadaInicio()) * nextRandon() + filas[0].ChegadaInicio()
-    return (filas[1].AtendimentoFinal() - filas[1].AtendimentoInicio()) * nextRandon() + filas[1].AtendimentoInicio()
+        return (filas[0].ChegadaFinal() - filas[0].ChegadaInicio()) * nextRandon() + filas[0].ChegadaInicio() 
+    if evento.tipoEvento == "Saida":
+        return (filas[1].AtendimentoFinal() - filas[1].AtendimentoInicio()) * nextRandon() + filas[1].AtendimentoInicio()
+
+    # tipoEvento == Passagem
+    return (filas[0].AtendimentoFinal() - filas[0].AtendimentoInicio()) * nextRandon() + filas[0].AtendimentoInicio() 
 
 
 # Chegada de um cliente
 def chegada(evento):
     global ultimo_tempo_global
     
+    # Tempo
     if filas[0].Status() <= filas[0].Capacity():
         tempoFilaX = filas[0].ArrayDeTempos()
         tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
@@ -71,6 +76,7 @@ def chegada(evento):
 def saida(evento):
     global ultimo_tempo_global
 
+    # Tempo
     if filas[1].Status() <= filas[1].Capacity():
         tempoFilaY = filas[1].ArrayDeTempos()
         tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
@@ -91,11 +97,15 @@ def passagem(evento):
     global ultimo_tempo_global
 
     # Acumula tempo
-    #if filas[1].Status() <= filas[1].Capacity():
-    #    tempoFilaY = filas[1].ArrayDeTempos()
-    #    tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+    if filas[1].Status() <= filas[1].Capacity():
+        tempoFilaX = filas[0].ArrayDeTempos()
+        tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        tempoFilaY = filas[1].ArrayDeTempos()
+        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
-    #ultimo_tempo_global = TEMPO_GLOBAL
+    ultimo_tempo_global = TEMPO_GLOBAL
+    
+    
     filas[0].Out()
     if filas[0].Status() >= filas[0].Servers():
         escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
@@ -150,8 +160,8 @@ def main():
         print(f"Erro ao ler o arquivo .yml: {e}")
         sys.exit(1)
 
-    for i in range(len(filas)):
-        print(filas[i])
+    #for i in range(len(filas)):
+     #   print(filas[i])
     
     # Criterio de Parada
     count = 100
@@ -179,6 +189,17 @@ def main():
 
     # for i in range(K+1):      
     #     print(f"{i}: {times[i]} ({round((times[i] / TEMPO_GLOBAL) * 100, 2)}%)\n ")
+
+
+    data = []
+    for i in range(0, len(filas)): 
+        t = filas[i].ArrayDeTempos()
+        for j in range(filas[i].Capacity()+1):    
+            data.append([filas[i].ArrayDeTempos()[j], (filas[i].ArrayDeTempos()[j]/TEMPO_GLOBAL)*100])
+	
+    print("Simulação (Estado - Tempo - Probabilidade)")
+    for row in data:
+	    print(*row)
     
 if __name__=="__main__":
     main()
