@@ -31,6 +31,9 @@ class Fila:
     def Loss(self):
         self.ClientesPerdidos += 1
 
+    def getLoss(self):
+        return self.ClientesPerdidos
+
 
     def In(self):
         self.QuantidadeClientes += 1

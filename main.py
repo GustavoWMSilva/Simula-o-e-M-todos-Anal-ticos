@@ -54,6 +54,9 @@ def chegada(evento):
     if filas[0].Status() <= filas[0].Capacity():
         tempoFilaX = filas[0].ArrayDeTempos()
         tempoFilaX[filas[0].Status()] = tempoFilaX[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        
+        tempoFilaY = filas[1].ArrayDeTempos()
+        tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
 
@@ -80,6 +83,9 @@ def saida(evento):
     if filas[1].Status() <= filas[1].Capacity():
         tempoFilaY = filas[1].ArrayDeTempos()
         tempoFilaY[filas[1].Status()] = tempoFilaY[filas[1].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+        
+        tempoFilaZ = filas[0].ArrayDeTempos()
+        tempoFilaZ[filas[0].Status()] = tempoFilaZ[filas[0].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
     
@@ -115,7 +121,7 @@ def passagem(evento):
         if filas[1].Status() <= filas[1].Servers():
             escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
     else:
-        filas[1].Loss()    
+        filas[1].Loss()
 
 
 def leituraArquivo(arquivo):
@@ -164,7 +170,7 @@ def main():
      #   print(filas[i])
     
     # Criterio de Parada
-    count = 100
+    count = 100_000
 
     # Primeiro cliente chegando...
     escalonador.append(Evento("Chegada", TEMPO_CHEGADA))
@@ -198,8 +204,21 @@ def main():
             data.append([filas[i].ArrayDeTempos()[j], (filas[i].ArrayDeTempos()[j]/TEMPO_GLOBAL)*100])
 	
     print("Simulação (Estado - Tempo - Probabilidade)")
-    for row in data:
-	    print(*row)
-    
+    for i in range(len(filas)):
+        print(f"Fila {i+1}:")
+        print("Estado | Tempo | Probabilidade")
+        total_tempo = 0
+        t = filas[i].ArrayDeTempos()
+        for j in range(filas[i].Capacity() + 1):
+            print(f"{j}       {t[j]}       {round((t[j] / TEMPO_GLOBAL) * 100, 2)}%")
+            total_tempo += t[j]
+        print(f"Total Tempo: {total_tempo}")
+        print()
+        total_probabilidade = 0
+        for j in range(filas[i].Capacity() + 1):
+            total_probabilidade += (t[j] / TEMPO_GLOBAL) * 100
+        print(f"Total Probabilidade: {round(total_probabilidade, 2)}%")
+        print(f"Clientes Perdidos na Fila {i+1}: {filas[i].getLoss()}")
+
 if __name__=="__main__":
     main()
