@@ -10,4 +10,4 @@ Para uso do leitor de arquivos .yml, utilize o comando:
 
 Para executar a aplicação, utilize o comando:
 
-`$ python3 main.py <nome-arquivo>.yml`
+`$ python3 main.py filaComRoteamento.yml`
