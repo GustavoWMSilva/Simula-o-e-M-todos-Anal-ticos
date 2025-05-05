@@ -23,16 +23,20 @@ TEMPO_CHEGADA = 2
 ultimo_tempo_global = 0
 
 class Evento():
-    def __init__(self, fila, tipoEvento, tempo):
+    def __init__(self, fila, tipoEvento, tempo, filaAnterior = None):
         self.tipoEvento = tipoEvento
         self.tempo = tempo
         self.fila = fila
+        self.filaAnterior = filaAnterior
 
     def __str__(self):
         return f"Evento: {self.tipoEvento}\nTempo: {self.tempo}\n"
     
     def filaDoEvento(self):
         return self.fila
+    
+    def filaAnteriorDoEvento(self):
+        return self.filaAnterior
     
 
 def nextRandon():
@@ -43,33 +47,33 @@ def nextRandon():
 
 # Fórmula de conversão
 def sorteio(evento):
+    filaAlvo, _ = procuraFilaTarget(evento)
+
     if evento.tipoEvento == "Chegada":
-        return (filas[0].ChegadaFinal() - filas[0].ChegadaInicio()) * nextRandon() + filas[0].ChegadaInicio() 
+        return (filaAlvo.ChegadaFinal() - filaAlvo.ChegadaInicio()) * nextRandon() + filaAlvo.ChegadaInicio() 
     if evento.tipoEvento == "Saida":
-        return (filas.AtendimentoFinal() - filas[1].AtendimentoInicio()) * nextRandon() + filas[1].AtendimentoInicio()
+        return (filaAlvo.AtendimentoFinal() - filaAlvo.AtendimentoInicio()) * nextRandon() + filaAlvo.AtendimentoInicio()
 
     # tipoEvento == Passagem
-    return (filas[0].AtendimentoFinal() - filas[0].AtendimentoInicio()) * nextRandon() + filas[0].AtendimentoInicio() 
+    return (filaAlvo.AtendimentoFinal() - filaAlvo.AtendimentoInicio()) * nextRandon() + filaAlvo.AtendimentoInicio() 
 
 
 def procuraFilaTarget(evento):
     filaEvento = evento.filaDoEvento()
+    filaAntecedente = evento.filaAnteriorDoEvento()
     filaAnalisada = None
 
     for i in range(len(filas)):
         if filas[i].getIdentificadorFila() == filaEvento:
             filaAnalisada = filas[i]
 
-    # print(f"Fila evento: {filaEvento}")
-    # print(f"Fila analisada: {filaAnalisada}")
-    return filaAnalisada
+    return filaAnalisada, filaAntecedente
 
 # Chegada de um cliente
 def chegada(evento):
     global ultimo_tempo_global
 
-    filaAnalisada = procuraFilaTarget(evento)
-    print(f"Fila analisada no inicio da chegada: {filaAnalisada}")
+    filaAnalisada, _ = procuraFilaTarget(evento)
 
     # Acumula tempo    
     if filaAnalisada.Status() <= filaAnalisada.Capacity():
@@ -79,49 +83,23 @@ def chegada(evento):
 
     ultimo_tempo_global = TEMPO_GLOBAL
     
-    foi_passado = False
-
-    print(f'fila analisada statuso: {filaAnalisada.Status()}')
-    print(f'fila analisada capacity: {filaAnalisada.Capacity()}')
-    print(f'fila analisada servers: {filaAnalisada.Servers()}')
     if filaAnalisada.Status() < filaAnalisada.Capacity():
         # Aumenta em 1 cliente a fila Q1
         filaAnalisada.In()
         if filaAnalisada.Status() <= filaAnalisada.Servers():
-
-            # if nextRandon() < filaAnalisada.filasTarget[0]['probability']:
-            #     filaT = filaAnalisada.filasTarget[0]['target']
-            #     # Agenda o atendimento do cliente
-            #     escalonador.append(Evento(filaT.getIdentificadorFila(), "Passagem", TEMPO_GLOBAL + sorteio(evento)))
-            # else:
-            #     # Agenda o atendimento do cliente
-            #     filaT = filaAnalisada.filasTarget[1]['target']
-            #     escalonador.append(filaT.getIdentificadorFila(), Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
-            for i in range(len(filaAnalisada.filasTarget)):
-                if nextRandon() < filaAnalisada.filasTarget[i]['probability']:
-                    # Passagem para outra fila
-                    filaT = filaAnalisada.filasTarget[i]['target']
-                    escalonador.append(Evento(filaT, "Passagem", TEMPO_GLOBAL + sorteio(evento)))
-                    foi_passado = True
-                    print(f'filaT: {filaT}')
-                    print(f"Fila analisada no if logo após o achar o filaT: {filaAnalisada}")
-
-                
-            if not foi_passado:
+            if nextRandon() < filaAnalisada.filasTarget[0]['probability']:
+                nextFila = filaAnalisada.filasTarget[0]['target']
+                # Agenda a passagem do cliente
+                escalonador.append(Evento(nextFila, "Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
+            else:
                 # Agenda o atendimento do cliente
-                print("ERRROOOOOUUUUUUUU")
-                # filaT = filaAnalisada.filasTarget[len(filaAnalisada.filasTarget)-1]['target']
-                # escalonador.append(filaT.getIdentificadorFila(), Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
+                nextFila = filaAnalisada.filasTarget[1]['target']
+                escalonador.append(Evento(nextFila, "Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
         else:
             filaAnalisada.Loss()
-    print(f"Fila analisada no fim dessa bagaça: {filaAnalisada}")
-    print(f" fila analisada.filasTarget {filaAnalisada.getFilaTarget()}")
-    print(f" tamanho da fila analisada.filasTarget {len(filaAnalisada.filasTarget)}")
-    print(f'escalonador antes de apensar: {escalonador}')
-    print(f'o que vai ser apensado: {filaAnalisada.getIdentificadorFila(),"Chegada", TEMPO_GLOBAL + sorteio(evento)}')
+ 
     # Agenda a chegada do cliente
-    # return
-    escalonador.append(Evento(filaAnalisada.getIdentificadorFila(),"Chegada", TEMPO_GLOBAL + sorteio(evento)))
+    escalonador.append(Evento("Q1","Chegada", TEMPO_GLOBAL + sorteio(evento)))
     # Ordena o escalonador de acordo com o tempo
     escalonador.sort(key=lambda x: x.tempo)
 
@@ -130,29 +108,27 @@ def chegada(evento):
 def saida(evento):
     global ultimo_tempo_global
 
-    filaAnalisada = procuraFilaTarget(evento)
-
-    # if filaAnalisada.Status() <= filaAnalisada.Capacity():
-    #     for i in range(len(filas)):
-    #         tempoFilaAux = filas[i].ArrayDeTempos()
-    #         tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
+    filaAnalisada, _ = procuraFilaTarget(evento)
 
     # Acumula tempo
-    if filas[1].Status() <= filas[1].Capacity():
+    if filaAnalisada.Status() <= filaAnalisada.Capacity():
         for i in range(len(filas)):
            tempoFilaAux = filas[i].ArrayDeTempos()
            tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
     
-    filas[1].Out()
-    if filas[1].Status() >= filas[1].Servers():
-        if nextRandon() < filas[1].filasTarget[0]['probability']:
-            # Passagem para outra fila
-            escalonador.append(Evento("Passagem", TEMPO_GLOBAL + sorteio(evento)))
-        else:
-            # Agenda o atendimento do cliente
-            escalonador.append(Evento("Saida", TEMPO_GLOBAL + sorteio(evento)))
+    filaAnalisada.Out()
+    if filaAnalisada.Status() >= filaAnalisada.Servers():
+        for i in range(len(filaAnalisada.filasTarget)-1):
+            if nextRandon() < filaAnalisada.filasTarget[i]['probability']:
+                # Passagem para outra fila
+                escalonador.append(Evento(filaAnalisada.filasTarget[i]['target'], "Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
+                break
+            else:
+                # Agenda a saída do cliente
+                escalonador.append(Evento(evento.filaDoEvento(), "Saida", TEMPO_GLOBAL + sorteio(evento)))
+
 
     # Ordena o escalonador de acordo com o tempo
     escalonador.sort(key=lambda x: x.tempo)
@@ -162,52 +138,31 @@ def saida(evento):
 def passagem(evento):
     global ultimo_tempo_global
 
+    filaAnalisada, filaAntecedente = procuraFilaTarget(evento)
+
     # Acumula tempo
-    # if filas[1].Status() <= filas[1].Capacity():
-    #     for i in range(len(filas)):
-    #        tempoFilaAux = filas[i].ArrayDeTempos()
-    #        tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
-
-    filaAnalisada = procuraFilaTarget(evento)
-
-    # Acumula tempo    
     if filaAnalisada.Status() <= filaAnalisada.Capacity():
         for i in range(len(filas)):
-            tempoFilaAux = filas[i].ArrayDeTempos()
-            tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
-
+           tempoFilaAux = filas[i].ArrayDeTempos()
+           tempoFilaAux[filas[i].Status()] = tempoFilaAux[filas[i].Status()] + (TEMPO_GLOBAL - ultimo_tempo_global)
 
     ultimo_tempo_global = TEMPO_GLOBAL
-    filaT = None
 
-    filaAnalisada.Out()
-    if filaAnalisada.Status() >= filaAnalisada.Servers():
-        passagem_de_fila_feita = False
-        for i in range(len(filaAnalisada.filasTarget)):
-            if nextRandon < filaAnalisada.filasTarget[i]['probability']:
-                # Passagem para outra fila
-                filaT = filaAnalisada.filasTarget[i]['target']
-                escalonador.append(Evento(filaT, "Passagem", TEMPO_GLOBAL + sorteio(evento)))
-                passagem_de_fila_feita = True
-                
+    filaAntecedente.Out()
+    if filaAntecedente.Status() >= filaAntecedente.Servers():
+        for i in range(len(filaAnalisada.filasTarget)-1):
+            if nextRandon() < filaAnalisada.filasTarget[i]['probability']:
+                escalonador.append(Evento(filaAnalisada.filasTarget[i]['target'] ,"Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
                 break
-        if not passagem_de_fila_feita:
-            # Agenda o atendimento do cliente
+            else:
+                escalonador.append(Evento(filaAnalisada.filasTarget[len(filaAnalisada.filasTarget)-1]['target'],"Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
+    
+    if filaAnalisada.Status() < filaAnalisada.Capacity():
+        filaAnalisada.In()
+        if filaAnalisada.Status() <= filaAnalisada.Servers():
             escalonador.append(Evento(filaAnalisada.getIdentificadorFila(), "Saida", TEMPO_GLOBAL + sorteio(evento)))
-        
-    #     print(f"Fila {filaAnalisada.getIdentificadorFila()} -> FilaT {filaT} com probabilidade {filaAnalisada.filasTarget[i]['probability']}")
-    #     print(f"Filas na posição 1: {filas[1]}")
-
-    # print(f'fila Target: {filaT}')
-    # print(f'fila analisadaaaaaaaaaaa: {filaAnalisada}')
-
-    if filaT is not None:
-        if filaT.Status() < filaT.Capacity():
-            filaT.In()
-            if filaT.Status() <= filaT.Servers():
-                escalonador.append(Evento(filaT, "Saida", TEMPO_GLOBAL + sorteio(evento)))
-        else:
-            filaT.Loss()
+    else:
+        filaAnalisada.Loss()
 
 
 def leituraArquivo(arquivo):
@@ -218,12 +173,13 @@ def leituraArquivo(arquivo):
     secaoFilasYml = dados['queues']
     secaoNetworkYml = dados['network']
     secaoArrivalsYml = dados.get('arrivals', {})
-    
-    for id, config in secaoFilasYml.items():
-        min_arrival = min_arrival = config.get('minArrival')
-        max_arrival = max_arrival = config.get('maxArrival')
 
-        # Adiciona os targets para as filas com base no arquivo de configuração
+    for id, config in secaoFilasYml.items():
+        min_arrival = config.get('minArrival')
+        max_arrival = config.get('maxArrival')
+
+        capacidade = 10**3 if config.get('capacity') == -1 else config.get('capacity')
+
         network = []
         for connection in secaoNetworkYml:
             if connection['source'] == id:
@@ -232,16 +188,10 @@ def leituraArquivo(arquivo):
                     'probability': connection['probability']
                 })
 
-        print(f"Fila {id} -> Conexões: {network}")
-
-        print(f'network: {network}')
-        for conn in network:
-            print(f"{id} -> {conn['target']} tem probabilidade {conn['probability']}")
-
         fila = Fila(
             IdentificadorFila=id,
             S=config['servers'],
-            K=config['capacity'],
+            K=capacidade,
             CHEGADA_ENTRE_INICIAL=min_arrival,
             CHEGADA_ENTRE_FINAL=max_arrival,
             SAIDA_ENTRE_INICIAL=config['minService'],
@@ -249,13 +199,12 @@ def leituraArquivo(arquivo):
             filasTarget=network
         )
         fila.setFilaTarget(network)
-        # print(f'fila: {fila}')
         filas.append(fila)
-        
 
     if secaoArrivalsYml:
         _, valor = next(iter(secaoArrivalsYml.items()))
         TEMPO_CHEGADA = valor
+
 
 
 def main():
@@ -272,11 +221,8 @@ def main():
         print(f"Erro ao ler o arquivo .yml: {e}")
         sys.exit(1)
 
-    #for i in range(len(filas)):
-     #   print(filas[i])
-    
     # Criterio de Parada
-    count = 123456
+    count = 100
 
     # Primeiro cliente chegando...
     escalonador.append(Evento("Q1", "Chegada", TEMPO_CHEGADA))
@@ -307,19 +253,17 @@ def main():
     print("Simulação (Estado - Tempo - Probabilidade)")
     for i in range(len(filas)):
         print(f"Fila {i+1}:")
+        print(f"Clientes Perdidos na Fila {i+1}: {filas[i].getLoss()}")
         print("Estado | Tempo | Probabilidade")
         total_tempo = 0
         t = filas[i].ArrayDeTempos()
         for j in range(filas[i].Capacity() + 1):
             print(f"{j}       {t[j]}       {round((t[j] / TEMPO_GLOBAL) * 100, 2)}%")
             total_tempo += t[j]
-        print(f"Total Tempo: {total_tempo}")
         print()
         total_probabilidade = 0
         for j in range(filas[i].Capacity() + 1):
             total_probabilidade += (t[j] / TEMPO_GLOBAL) * 100
-        print(f"Total Probabilidade: {round(total_probabilidade, 2)}%")
-        print(f"Clientes Perdidos na Fila {i+1}: {filas[i].getLoss()}")
 
 if __name__=="__main__":
     main()
