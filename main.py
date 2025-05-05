@@ -120,7 +120,7 @@ def saida(evento):
     
     filaAnalisada.Out()
     if filaAnalisada.Status() >= filaAnalisada.Servers():
-        for i in range(len(filaAnalisada.filasTarget)-1):
+        for i in range(len(filaAnalisada.filasTarget)):
             if nextRandon() < filaAnalisada.filasTarget[i]['probability']:
                 # Passagem para outra fila
                 escalonador.append(Evento(filaAnalisada.filasTarget[i]['target'], "Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
@@ -150,7 +150,7 @@ def passagem(evento):
 
     filaAntecedente.Out()
     if filaAntecedente.Status() >= filaAntecedente.Servers():
-        for i in range(len(filaAnalisada.filasTarget)-1):
+        for i in range(len(filaAnalisada.filasTarget)):
             if nextRandon() < filaAnalisada.filasTarget[i]['probability']:
                 escalonador.append(Evento(filaAnalisada.filasTarget[i]['target'] ,"Passagem", TEMPO_GLOBAL + sorteio(evento), filaAnalisada))
                 break
@@ -258,7 +258,7 @@ def main():
         total_tempo = 0
         t = filas[i].ArrayDeTempos()
         for j in range(filas[i].Capacity() + 1):
-            print(f"{j}       {t[j]}       {round((t[j] / TEMPO_GLOBAL) * 100, 2)}%")
+            print(f"{j}       {t[j]}       {round((t[j] / TEMPO_GLOBAL) * 100, 4)}%")
             total_tempo += t[j]
         print()
         total_probabilidade = 0
