@@ -222,7 +222,7 @@ def main():
         sys.exit(1)
 
     # Criterio de Parada
-    count = 100
+    count = 100_000
 
     # Primeiro cliente chegando...
     escalonador.append(Evento("Q1", "Chegada", TEMPO_CHEGADA))
