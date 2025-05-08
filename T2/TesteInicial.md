@@ -58,3 +58,28 @@ Number of losses: 0
 =========================================================
 Simulation average time: 998904,8706
 =========================================================
+
+
+=== Resultados da Fila 1 ===
+População média (N): 0.3966
+Vazão (D) [clientes/hora]: 2.1633
+Utilização (U): 0.1983
+Tempo de resposta (W) [horas]: 0.1833
+Tempo de resposta (W) [minutos]: 11.0
+===========================
+
+=== Resultados da Fila 2 ===
+População média (N): 4.8144
+Vazão (D) [clientes/hora]: 3.8515
+Utilização (U): 0.8024
+Tempo de resposta (W) [horas]: 1.25
+Tempo de resposta (W) [minutos]: 75.0
+===========================
+
+=== Resultados da Fila 3 ===
+População média (N): 0.1511
+Vazão (D) [clientes/hora]: 0.2418
+Utilização (U): 0.0756
+Tempo de resposta (W) [horas]: 0.625
+Tempo de resposta (W) [minutos]: 37.5
+===========================
